@@ -2,8 +2,14 @@ from LoadBalancer import LoadBalancer, Config
 import argparse
 import matplotlib.pyplot as plt
 import time
+# import js
 
 mem = []
+
+plot_cold_start = False
+plot_mem = False
+plot_latency = False
+plot_delay = False
 
 def parse_num_traces(value):
     if value.lower() == "all":
@@ -48,7 +54,9 @@ def main():
     parser.add_argument(
         "--input_file",
         type=str,
-        default="/scripts/example_trace.txt", # default='AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt',
+        # default="/scripts/test_trace_20min.txt",
+        # default="/scripts/example_trace.txt", 
+        default='/scripts/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt',
         help="File path to a file with traces you want to simulate"
     )
     parser.add_argument(
@@ -102,8 +110,10 @@ def main():
         i+=1
         if i % 1000 == 0:
             print("finished running ",i," calls")
-        if i % 100 == 0:
+        if i % 10000 == 0:
             mem = load_balancer.getMemUsage()
+            sendToReact(mem)
+            # plot_mem_graph(load_balancer, args)
     end_time = time.time()
     print(f"Simulation of {len(sorted_lines)} function calls for {args.eval_description} took {end_time - start_time} seconds")
 
@@ -127,6 +137,7 @@ def main():
         app_cold_starts.append(num_cold/total)
     
     mem = load_balancer.getMemUsage()
+    sendToReact(mem)
 
     if args.save_output:
         with open(f"latencies_{eval}.txt", "w") as file:
@@ -140,12 +151,20 @@ def main():
         with open(f"mem_usage_{eval}.txt", "w") as file:
             file.write(",".join(map(str, mem)))
 
-    plot_cold_start = False
-    plot_mem = True
-    plot_latency = False
-    plot_delay = False
+    # plot_cold_start = False
+    # plot_mem = True
+    # plot_latency = False
+    # plot_delay = False
 
-    plt.grid(True)
+    # plt.grid(True)
+    # plot_mem_graph(load_balancer, args)
+    if plot_mem:
+        # plt.subplot(2, 2, 2)
+        plt.plot(mem)  # Adjust bins as needed
+        plt.xlabel('Time (sec)')
+        plt.ylabel('Mem Usage (MB)')
+        plt.title(f'Mem Usage Over Time with {eval} ({args.num_traces} Function Calls)')
+
     # Plot CDF of app cold start percentage
     if plot_cold_start:
         plt.subplot(2, 2, 1)
@@ -156,14 +175,6 @@ def main():
         plt.ylabel('Cumulative Probability')
         plt.title(f'CDF of App Cold Start % with {eval} ({args.num_traces} Function Calls)')
         plt.legend()
- 
-    # Plot graph of memory usage over time
-    if plot_mem:
-        plt.subplot(2, 2, 2)
-        plt.plot(mem)  # Adjust bins as needed
-        plt.xlabel('Time (sec)')
-        plt.ylabel('Mem Usage (MB)')
-        plt.title(f'Mem Usage Over Time with {eval} ({args.num_traces} Function Calls)')
 
     # plot histogram of latencies on log scale
     if plot_latency:
@@ -187,8 +198,19 @@ def main():
         plt.title(f'Histogram of Scheduling Delay with {eval} ({args.num_traces} Function Calls)')
         plt.grid(True)
 
-    plt.tight_layout()
-    plt.show()
+    # plt.tight_layout()
+    # plt.show()
+
+# def plot_mem_graph(load_balancer, args):
+#     # Plot graph of memory usage over time
+#     if plot_mem:
+#         # plt.subplot(2, 2, 2)
+#         plt.plot(mem)  # Adjust bins as needed
+#         plt.xlabel('Time (sec)')
+#         plt.ylabel('Mem Usage (MB)')
+#         plt.title(f'Mem Usage Over Time with {eval} ({args.num_traces} Function Calls)')
+
+
 
 if __name__ == "__main__":
     main()
