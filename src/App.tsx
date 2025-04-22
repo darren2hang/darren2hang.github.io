@@ -48,7 +48,8 @@ function App() {
         "Histogram.py",
         "LoadBalancer.py",
         "VM.py",
-        "example_trace.txt"
+        "example_trace.txt",
+        "AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt"
       ]
 
       // Create a directory inside Pyodide's virtual FS
@@ -80,8 +81,14 @@ function App() {
         packages.map((packageName: string) => pyodide.loadPackage(packageName))
       )
      
+      // handle python command line arguments
+      const args = ["main.py", "--num_traces", "100"];
+      const argString = JSON.stringify(args);
       // execute python script
       await pyodide.runPythonAsync(`
+        import sys, json
+        sys.argv = json.loads('${argString}')
+
         exec(open('/scripts/main.py').read())  
       `)
       // const response = await fetch("python-scripts/main.py");
