@@ -2,7 +2,6 @@ from LoadBalancer import LoadBalancer, Config
 import argparse
 import matplotlib.pyplot as plt
 import time
-# import js
 
 mem = []
 
@@ -112,7 +111,9 @@ def main():
             print("finished running ",i," calls")
         if i % 10000 == 0:
             mem = load_balancer.getMemUsage()
-            sendToReact(mem)
+            time_index = list(range(len(mem)))
+            xy = list(zip(time_index,mem))
+            sendToReact(xy)
             # plot_mem_graph(load_balancer, args)
     end_time = time.time()
     print(f"Simulation of {len(sorted_lines)} function calls for {args.eval_description} took {end_time - start_time} seconds")
@@ -137,7 +138,9 @@ def main():
         app_cold_starts.append(num_cold/total)
     
     mem = load_balancer.getMemUsage()
-    sendToReact(mem)
+    time_index = list(range(len(mem)))
+    xy = list(zip(time_index,mem))
+    sendToReact(xy)
 
     if args.save_output:
         with open(f"latencies_{eval}.txt", "w") as file:

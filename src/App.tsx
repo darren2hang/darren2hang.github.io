@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import Plot from 'react-plotly.js';
+import { LTTB } from 'downsample';
 
 // Pyodide types aren’t built-in, so we can loosely type it
 type PyodideInterface = {
@@ -18,7 +19,8 @@ declare global {
 function App() {
   const [pyodide, setPyodide] = useState<PyodideInterface | null>(null);
   // const [output, setOutput] = useState<string>("");
-  const [data, setData] = useState<number[]>([]);
+  const [xData, setXData] = useState<number[]>([]);
+  const [yData, setYData] = useState<number[]>([]);
   const workerRef = useRef<Worker>(null);
   const [status, setStatus] = useState("Loading...");
 
@@ -38,8 +40,15 @@ function App() {
 
       if (type === "data") {
         console.log("App.tsx received data")
-        console.log(payload)
-        setData(payload);
+        // console.log(payload)
+        // console.log("payload x")
+        // console.log(payload.length)
+        const n = Math.floor(payload.length / 30);
+        const downsampled = Array.from(LTTB(payload, n)); // Downsample to 1000 points
+        const downsampledX = downsampled.map((d: any) => d[0]);
+        const downsampledY = downsampled.map((d: any) => d[1]);
+        setXData(downsampledX);
+        setYData(downsampledY);
       }
 
       if (type === "done") {
@@ -57,7 +66,8 @@ function App() {
   }, []);
 
   const runPython = () => {
-    setData([]);
+    setXData([]);
+    setYData([]);
     setStatus("Running...");
     workerRef.current?.postMessage({ type: "run" });
   };
@@ -192,11 +202,12 @@ function App() {
       <button onClick={runPython}>Run Python</button>
       <p>{status}</p>
 
-      {data.length > 0 && (
+      {xData.length > 0 && (
         <Plot
           data={[
             {
-              y: data,
+              x: xData,
+              y: yData,
               type: 'scattergl',
               mode: 'lines',
               line: { color: 'blue' },
@@ -204,22 +215,6 @@ function App() {
           ]}
           layout={{ width: 800, height: 400, title: 'Memory Usage Over Time' }}
         />
-        // <table border={1} cellPadding={10} style={{ marginTop: "1rem" }}>
-        //   <thead>
-        //     <tr>
-        //       {Object.keys(data[0]).map((key) => (
-        //         <th key={key}>{key}</th>
-        //       ))}
-        //     </tr>
-        //   </thead>
-        //   <tbody>
-        //     {data.map((row, i) => (
-        //       <tr key={i}>
-        //           <td key={i+"row"}>{row}</td>
-        //       </tr>
-        //     ))}
-        //   </tbody>
-        // </table>
       )}
     </div>
   );

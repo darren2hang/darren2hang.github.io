@@ -9,11 +9,6 @@ let pyodide: PyodideInterface;
 declare global {
     var loadPyodide: (config?: { indexURL: string }) => Promise<any>;
   }
-  
-// // Expose the JS function to Python
-// (self as any).sendToReact = (data: string) => {
-//   self.postMessage({ type: "data", data });
-// };
 
 self.onmessage = async (event) => {
   const { type } = event.data;
@@ -25,10 +20,10 @@ self.onmessage = async (event) => {
     
     // ✅ Wrap the JS function in a Python-compatible proxy
     const sendToReact = (data: any) => {
-      console.log("in sendToReact")
-      console.log(data)
+      // console.log("in sendToReact")
+      // console.log(data)
       const jsObj = data.toJs({ deep: true });
-      console.log(jsObj)
+      // console.log(jsObj)
       self.postMessage({ type: 'data', payload: jsObj });
     };
 
@@ -80,7 +75,7 @@ self.onmessage = async (event) => {
         await Promise.all(
           packages.map((packageName: string) => pyodide.loadPackage(packageName))
         )
-       
+
         console.log("Executing python script")
         // handle python command line arguments
         const args = ["main.py", "--num_traces", "all"];
