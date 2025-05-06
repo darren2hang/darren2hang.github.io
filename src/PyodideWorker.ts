@@ -6,9 +6,9 @@ import { loadPyodide, PyodideInterface } from 'pyodide';
 let pyodide: PyodideInterface;
 
 // Declare global function for loadPyodide
-declare global {
-    var loadPyodide: (config?: { indexURL: string }) => Promise<any>;
-  }
+// declare global {
+//     var loadPyodide: (config?: { indexURL: string }) => Promise<any>;
+//   }
 
 self.onmessage = async (event) => {
   const { type } = event.data;
@@ -17,6 +17,7 @@ self.onmessage = async (event) => {
     pyodide = await loadPyodide({
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.5/full/",
     });
+    // pyodide = await loadPyodide();
     
     // ✅ Wrap the JS function in a Python-compatible proxy
     const sendToReact = (data: any) => {
