@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import Plot from 'react-plotly.js';
+import { LTTB } from 'downsample';
 
 // Pyodide types aren’t built-in, so we can loosely type it
 type PyodideInterface = {
@@ -16,91 +18,167 @@ declare global {
 
 function App() {
   const [pyodide, setPyodide] = useState<PyodideInterface | null>(null);
-  const [output, setOutput] = useState<string>("");
-  const [data, setData] = useState<Array<number>>([]);
+  // const [output, setOutput] = useState<string>("");
+  const [xData, setXData] = useState<number[]>([]);
+  const [yData, setYData] = useState<number[]>([]);
+  const workerRef = useRef<Worker>(null);
+  const [status, setStatus] = useState("Loading...");
 
   useEffect(() => {
-    const loadPyodideScript = async () => {
-      // Load the script from CDN
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js";
-      script.onload = async () => {
-        const py = await window.loadPyodide();
-        setPyodide(py);
-      };
-      script.onerror = () => {
-        console.error("Failed to load Pyodide script.");
-      };
-      document.body.appendChild(script);
+    const worker = new Worker(new URL("./PyodideWorker.ts", import.meta.url), {
+      type: "module",
+    });
+
+    workerRef.current = worker;
+
+    worker.onmessage = (event) => {
+      const { type, payload, error } = event.data;
+
+      if (type === "ready") {
+        setStatus("Ready to run Python!");
+      }
+
+      if (type === "data") {
+        console.log("App.tsx received data")
+        // console.log(payload)
+        // console.log("payload x")
+        // console.log(payload.length)
+        const n = Math.floor(payload.length / 30);
+        const downsampled = Array.from(LTTB(payload, n)); // Downsample to 1000 points
+        const downsampledX = downsampled.map((d: any) => d[0]);
+        const downsampledY = downsampled.map((d: any) => d[1]);
+        setXData(downsampledX);
+        setYData(downsampledY);
+      }
+
+      if (type === "done") {
+        setStatus("Simulation complete.");
+      }
+
+      if (type === "error") {
+        setStatus(`Error: ${error}`);
+      }
     };
 
-    loadPyodideScript();
+    worker.postMessage({ type: "init" });
+
+    return () => worker.terminate();
   }, []);
 
+  const runPython = () => {
+    setXData([]);
+    setYData([]);
+    setStatus("Running...");
+    workerRef.current?.postMessage({ type: "run" });
+  };
 
-  const runPython = async () => {
-    if (!pyodide) return;
 
-    try {
-      const files = [
-        "main.py",
-        "Function.py",
-        "Histogram.py",
-        "LoadBalancer.py",
-        "VM.py",
-        "example_trace.txt",
-        "AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt"
-      ]
+  // // Register the JS callback that Python will call
+  // useEffect(() => {
+  //   (window as any).onDataChunk = (proxyData: any) => {
+  //     console.log("React received data chunk")
+  //     // console.log(proxyData)
+  //     var array: number [];
+  //     if (proxyData.toJs) {
+  //       console.log("converting proxy")
+  //       array = proxyData.toJs({copy: true}); // full JS copy
+  //       proxyData.destroy(); // ✨ important: free proxy
+  //     } else {
+  //       array = proxyData;
+  //     }
+  //     // console.log(array)
+  //     const dataArr = [...array]
+  //     setData(dataArr);
+  //   };
+  // }, []);
 
-      // Create a directory inside Pyodide's virtual FS
-      if (!pyodide.FS.analyzePath("/scripts").exists) {
-        pyodide.FS.mkdir("/scripts");
-      }
+  // useEffect(() => {
+  //   const loadPyodideScript = async () => {
+  //     // Load the script from CDN
+  //     const script = document.createElement("script");
+  //     script.src = "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js";
+  //     script.onload = async () => {
+  //       const py = await window.loadPyodide();
+  //       setPyodide(py);
+  //     };
+  //     script.onerror = () => {
+  //       console.error("Failed to load Pyodide script.");
+  //     };
+  //     document.body.appendChild(script);
+  //   };
 
-      // Load each file
-      for (const filename of files) {
-        const response = await fetch(`/scripts/${filename}`);
-        const code = await response.text();
-        pyodide.FS.writeFile(`/scripts/${filename}`, code);
-      }
+  //   loadPyodideScript();
+  // }, []);
 
-      console.log(pyodide.FS.readdir('/scripts'));
 
-      // Add /scripts to Python module search path
-      await pyodide.runPythonAsync(`
-        import sys
-        sys.path.append('/scripts')
-      `);
+  // const runPython = async () => {
+  //   if (!pyodide) return;
+
+  //   try {
+  //     console.log("Starting process to run python code")
+  //     const files = [
+  //       "main.py",
+  //       "Function.py",
+  //       "Histogram.py",
+  //       "LoadBalancer.py",
+  //       "VM.py",
+  //       "example_trace.txt",
+  //       "test_trace_20min.txt",
+  //       "AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt"
+  //     ]
+
+  //     // Create a directory inside Pyodide's virtual FS
+  //     if (!pyodide.FS.analyzePath("/scripts").exists) {
+  //       pyodide.FS.mkdir("/scripts");
+  //     }
+
+  //     // Load each file
+  //     for (const filename of files) {
+  //       const response = await fetch(`/scripts/${filename}`);
+  //       const code = await response.text();
+  //       pyodide.FS.writeFile(`/scripts/${filename}`, code);
+  //     }
+
+  //     console.log(pyodide.FS.readdir('/scripts'));
+
+  //     // Add /scripts to Python module search path
+  //     await pyodide.runPythonAsync(`
+  //       import sys
+  //       sys.path.append('/scripts')
+  //     `);
       
-      // download packages
-      const packages = [
-        'numpy',
-        'matplotlib'
-      ]
-      await Promise.all(
-        packages.map((packageName: string) => pyodide.loadPackage(packageName))
-      )
+  //     // download packages
+  //     const packages = [
+  //       'numpy',
+  //       'matplotlib',
+  //     ]
+  //     await Promise.all(
+  //       packages.map((packageName: string) => pyodide.loadPackage(packageName))
+  //     )
      
-      // handle python command line arguments
-      const args = ["main.py", "--num_traces", "100"];
-      const argString = JSON.stringify(args);
-      // execute python script
-      await pyodide.runPythonAsync(`
-        import sys, json
-        sys.argv = json.loads('${argString}')
+  //     console.log("Executing python script")
+  //     // handle python command line arguments
+  //     const args = ["main.py", "--num_traces", "all"];
+  //     const argString = JSON.stringify(args);
+  //     // execute python script
+  //     await pyodide.runPythonAsync(`
+  //       import sys, json
+  //       sys.argv = json.loads('${argString}')
 
-        exec(open('/scripts/main.py').read())  
-      `)
-      // const response = await fetch("python-scripts/main.py");
-      // const code = await response.text();
-      // await pyodide.runPythonAsync(code);
-      const mem_data = pyodide.globals.get("mem");
-      setData(mem_data);
-      setOutput("finished running main.py")
-    } catch(err) {
-      console.log("Error: "+(err as Error).message)
-      setOutput("Error: "+(err as Error).message);
-    }
+  //       exec(open('/scripts/main.py').read())  
+  //     `)
+  //     // const response = await fetch("python-scripts/main.py");
+  //     // const code = await response.text();
+  //     // await pyodide.runPythonAsync(code);
+
+  //     // const mem_data = pyodide.globals.get("mem");
+  //     // console.log(mem_data)
+  //     // setData(mem_data);
+  //     setOutput("finished running main.py")
+  //   } catch(err) {
+  //     console.log("Error: "+(err as Error).message)
+  //     setOutput("Error: "+(err as Error).message);
+  //   }
 
     // await pyodide.runPythonAsync(`
     //   import json
@@ -116,31 +194,27 @@ function App() {
     // const parsed: Array<string> = JSON.parse(json);
     // setData(parsed);
     // setOutput("Python code executed!");
-  };
+  // };
 
   return (
     <div style={{ padding: "2rem" }}>
       <h1>React + Pyodide (TypeScript)</h1>
       <button onClick={runPython}>Run Python</button>
-      <p>{output}</p>
+      <p>{status}</p>
 
-      {data.length > 0 && (
-        <table border={1} cellPadding={10} style={{ marginTop: "1rem" }}>
-          <thead>
-            <tr>
-              {Object.keys(data[0]).map((key) => (
-                <th key={key}>{key}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, i) => (
-              <tr key={i}>
-                  <td key={i+"row"}>{row}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {xData.length > 0 && (
+        <Plot
+          data={[
+            {
+              x: xData,
+              y: yData,
+              type: 'scattergl',
+              mode: 'lines',
+              line: { color: 'blue' },
+            },
+          ]}
+          layout={{ width: 800, height: 400, title: 'Memory Usage Over Time' }}
+        />
       )}
     </div>
   );
