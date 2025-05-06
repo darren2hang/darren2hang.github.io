@@ -3,12 +3,12 @@ import Plot from 'react-plotly.js';
 import { LTTB } from 'downsample';
 
 // Pyodide types aren’t built-in, so we can loosely type it
-type PyodideInterface = {
-  runPythonAsync: (code: string) => Promise<any>;
-  loadPackage: (packageName: string) => Promise<any>;
-  globals: any;
-  FS: any;
-};
+// type PyodideInterface = {
+//   runPythonAsync: (code: string) => Promise<any>;
+//   loadPackage: (packageName: string) => Promise<any>;
+//   globals: any;
+//   FS: any;
+// };
 
 declare global {
   interface Window {
@@ -17,7 +17,6 @@ declare global {
 }
 
 function App() {
-  const [pyodide, setPyodide] = useState<PyodideInterface | null>(null);
   // const [output, setOutput] = useState<string>("");
   const [xData, setXData] = useState<number[]>([]);
   const [yData, setYData] = useState<number[]>([]);
