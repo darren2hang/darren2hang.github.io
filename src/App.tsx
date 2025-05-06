@@ -24,7 +24,7 @@ function App() {
   const [status, setStatus] = useState("Loading...");
 
   useEffect(() => {
-    const worker = new Worker(new URL("./PyodideWorker.ts", import.meta.url), {
+    const worker = new Worker(new URL("./PyodideWorker.mts", import.meta.url), {
       type: "module",
     });
 
