@@ -54,8 +54,8 @@ def main():
         "--input_file",
         type=str,
         # default="/scripts/test_trace_20min.txt",
-        # default="/scripts/example_trace.txt", 
-        default='/scripts/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt',
+        default="/scripts/example_trace.txt", 
+        # default='/scripts/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt',
         help="File path to a file with traces you want to simulate"
     )
     parser.add_argument(

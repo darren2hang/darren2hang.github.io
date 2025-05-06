@@ -43,7 +43,7 @@ self.onmessage = async (event) => {
           "VM.py",
           "example_trace.txt",
           "test_trace_20min.txt",
-          "AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt"
+          // "AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt"
         ]
   
         // Create a directory inside Pyodide's virtual FS
@@ -51,7 +51,7 @@ self.onmessage = async (event) => {
         if (!fs.analyzePath("/scripts").exists) {
             fs.mkdir("/scripts");
         }
-  
+
         // Load each file
         for (const filename of files) {
           const response = await fetch(`/scripts/${filename}`);
