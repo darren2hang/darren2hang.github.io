@@ -11,7 +11,7 @@ let pyodide: PyodideInterface;
 //   }
 
 self.onmessage = async (event) => {
-  const { type, input_file, policy, keepAliveTime, cacheSize } = event.data;
+  const { type, input_file, policy } = event.data;
 
   if (type === 'init') {
     pyodide = await loadPyodide({
