@@ -1,7 +1,8 @@
-from LoadBalancer import LoadBalancer, Config
+from LoadBalancer import LoadBalancer, Config, COLD_START_TYPE
 import argparse
 import matplotlib.pyplot as plt
 import time
+import numpy as np
 
 mem = []
 
@@ -53,9 +54,8 @@ def main():
     parser.add_argument(
         "--input_file",
         type=str,
-        # default="/scripts/test_trace_20min.txt",
-        default="/scripts/example_trace.txt", 
-        # default='/scripts/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt',
+        default="/scripts/input_file.txt", 
+        # default='AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt',
         help="File path to a file with traces you want to simulate"
     )
     parser.add_argument(
@@ -85,8 +85,12 @@ def main():
             if len(values) == 4:
                 # Process the values (you  can modify this part to suit your needs)
                 app_name, func_name, end_ts, runtime = values
+                if len(values) > 4:
+                    line = [app_name, func_name, float(end_ts) - float(runtime), float(runtime), float(values[4])]
+                else: 
+                    line = [app_name, func_name, float(end_ts) - float(runtime), float(runtime)]
                 # approximate function invocation time with end timestamp - duration of function execution
-                lines.append([app_name, func_name, float(end_ts) - float(runtime), float(runtime)])
+                lines.append(line)
             else:
                 print("Skipping invalid row with incorrect number of values: ", values)
 
@@ -103,9 +107,23 @@ def main():
     load_balancer = LoadBalancer(config, use_caching, use_histogram, use_fixed_keep_alive)
     i = 0
     start_time = time.time()
+    finish_time = 0
+
+    func_mem_map = {}
     for line in sorted_lines:
         app_name, func_name, start_ts, runtime = line
-        load_balancer.invokeFunction(app_name, func_name, start_ts, runtime)
+        if len(line) == 5 and line[5] != "":
+            mem = line[5]
+        else:
+            func_key = str(app_name)+":"+str(func_name)
+            if func_key in func_mem_map:
+                mem = func_mem_map[func_key]
+            else:
+                mem = np.random.normal(170, 60, 1)[0]
+                func_mem_map[func_key] = mem
+        exp_end_time = load_balancer.invokeFunction(app_name, func_name, start_ts, runtime, mem)
+        if exp_end_time != -1 and exp_end_time > finish_time:
+            finish_time = exp_end_time
         i+=1
         if i % 1000 == 0:
             print("finished running ",i," calls")
@@ -114,15 +132,41 @@ def main():
             time_index = list(range(len(mem)))
             xy = list(zip(time_index,mem))
             sendToReact(xy)
-            # plot_mem_graph(load_balancer, args)
+    load_balancer.speedForward(finish_time+10)
+
+    mem = load_balancer.getMemUsage()
+    time_index = list(range(len(mem)))
+    xy = list(zip(time_index,mem))
+    sendToReact(xy)
+
     end_time = time.time()
     print(f"Simulation of {len(sorted_lines)} function calls for {args.eval_description} took {end_time - start_time} seconds")
+
+    num_func_remaining = 0
+    for app_name in load_balancer.vm_map.keys():
+        vms = load_balancer.vm_map[app_name]
+        for vm in vms:
+            num_func_remaining += len(vm.function_queue)
+            # print(str(app_name) +" : "+str(vm))
+    
+    print("Last finish time: ", finish_time)
+    print("num functions remaining: ", num_func_remaining)
 
 
     # Analysis 
     eval = args.eval_description
     print("Overall cold start percentage: ",load_balancer.getColdStartPercentage())
     print("Max number of vms: ", load_balancer.max_vm_num)
+
+    print("Total number of functions successfully executed: ", load_balancer.num_func_completed)
+    # print("latency: ", load_balancer.latencies)
+    print("P50 latency: ", np.percentile(load_balancer.latencies, 50))
+    print("P95 latency: ", np.percentile(load_balancer.latencies, 95))
+    # print(load_balancer.vm_map)
+
+    print("Num cold starts from no vm available: ",load_balancer.cold_start_types.count(COLD_START_TYPE.NO_VM))
+    print("Num cold starts from function not in memory: ",load_balancer.cold_start_types.count(COLD_START_TYPE.FUNCTION_UNLOADED))
+
     # print(load_balancer.cold_starts)
     # for i in range(len(sorted_lines)):
     #     print(sorted_lines[i])
@@ -138,9 +182,6 @@ def main():
         app_cold_starts.append(num_cold/total)
     
     mem = load_balancer.getMemUsage()
-    time_index = list(range(len(mem)))
-    xy = list(zip(time_index,mem))
-    sendToReact(xy)
 
     if args.save_output:
         with open(f"latencies_{eval}.txt", "w") as file:
@@ -154,13 +195,7 @@ def main():
         with open(f"mem_usage_{eval}.txt", "w") as file:
             file.write(",".join(map(str, mem)))
 
-    # plot_cold_start = False
-    # plot_mem = True
-    # plot_latency = False
-    # plot_delay = False
-
-    # plt.grid(True)
-    # plot_mem_graph(load_balancer, args)
+    # Plot CDF of app cold start percentage
     if plot_mem:
         # plt.subplot(2, 2, 2)
         plt.plot(mem)  # Adjust bins as needed
@@ -203,17 +238,6 @@ def main():
 
     # plt.tight_layout()
     # plt.show()
-
-# def plot_mem_graph(load_balancer, args):
-#     # Plot graph of memory usage over time
-#     if plot_mem:
-#         # plt.subplot(2, 2, 2)
-#         plt.plot(mem)  # Adjust bins as needed
-#         plt.xlabel('Time (sec)')
-#         plt.ylabel('Mem Usage (MB)')
-#         plt.title(f'Mem Usage Over Time with {eval} ({args.num_traces} Function Calls)')
-
-
 
 if __name__ == "__main__":
     main()
