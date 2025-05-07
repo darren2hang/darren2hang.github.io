@@ -4,12 +4,14 @@ class Function:
             func_name,
             invoke_time,
             runtime,
-            scheduled_time    
+            scheduled_time,
+            mem_size    
         ):
         self.func_name = func_name
         self.invoke_time = invoke_time
         self.runtime = runtime
         self.scheduled_time = scheduled_time # this represents when the function will actually start running
+        self.mem_size = mem_size
 
     def getFinishTime(self):
         return self.scheduled_time + self.runtime

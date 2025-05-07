@@ -1,0 +1,35 @@
+.simulation-page {
+    display: flex;
+    flex-direction: row;
+    width: 100vw;
+    flex: 1;
+}
+
+.simulation-inputs {
+    display: flex;
+    flex-direction: column;
+    width: 40vw;
+    padding: 0 2rem;
+    gap: 1rem;
+
+    textarea {
+        height: 60%;
+    }
+
+    p {
+        margin: 0;
+    }
+}
+
+.simulation-results {
+    display: flex;
+    flex-direction: column;
+    width: 60vw;
+    padding: 0 2rem;
+}
+
+.simulation-configs {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}

@@ -11,7 +11,7 @@ let pyodide: PyodideInterface;
 //   }
 
 self.onmessage = async (event) => {
-  const { type } = event.data;
+  const { type, input_file, policy, keepAliveTime, cacheSize } = event.data;
 
   if (type === 'init') {
     pyodide = await loadPyodide({
@@ -59,6 +59,8 @@ self.onmessage = async (event) => {
           const code = await response.text();
           pyodide.FS.writeFile(`/scripts/${filename}`, code);
         }
+        // create input file from react text input
+        pyodide.FS.writeFile(`/scripts/input_file.txt`, input_file);
   
         console.log(pyodide.FS.readdir('/scripts'));
   
@@ -79,7 +81,7 @@ self.onmessage = async (event) => {
 
         console.log("Executing python script")
         // handle python command line arguments
-        const args = ["main.py", "--num_traces", "all"];
+        const args = ["main.py", "--num_traces", "all", "--policy", policy];
         const argString = JSON.stringify(args);
         // execute python script
         await pyodide.runPythonAsync(`
