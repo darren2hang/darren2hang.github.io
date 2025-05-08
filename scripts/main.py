@@ -11,6 +11,8 @@ plot_mem = False
 plot_latency = False
 plot_delay = False
 
+cold_start_rate = 1.0
+
 def parse_num_traces(value):
     if value.lower() == "all":
         return "all"
@@ -64,6 +66,87 @@ def main():
         default='Histogram + Cache',
         help="Short Description of Policy to put in Graph Titles"
     )
+    parser.add_argument(
+        "--keep_alive_time",
+        type=float,
+        default=10,
+        help="Keep Alive Time (minutes)"
+    )
+    parser.add_argument(
+        "--cache_size",
+        type=int,
+        default=256,
+        help="Max number of VMs)"
+    )
+    parser.add_argument(
+        "--cv_threshold",
+        type=float,
+        default=2.0,
+        help="CV for Histogram",
+    )
+
+    parser.add_argument(
+        "--vm_threshold",
+        type=float,
+        default=0.5,
+        help="CPU Rate Threshold autoscaling VMs",
+    )
+
+    parser.add_argument(
+        "--cpu_rate_window",
+        type=float,
+        default=5.0,
+        help="Time window (in seconds) for CPU rate analysis",
+    )
+
+    parser.add_argument(
+        "--max_hist",
+        type=int,
+        default=240,
+        help="Maximum range for Histogram (minutes)",
+    )
+
+    parser.add_argument(
+        "--head_percentile",
+        type=int,
+        default=5,
+        help="Head Percentile for Histogram",
+    )
+
+    parser.add_argument(
+        "--tail_percentile",
+        type=int,
+        default=99,
+        help="Tail Percentile for Histogram",
+    )
+
+    parser.add_argument(
+        "--vm_start",
+        type=float,
+        default=2.5,
+        help="Time to Start a VM (sec)",
+    )
+
+    parser.add_argument(
+        "--vm_end",
+        type=float,
+        default=2.0,
+        help="Time to delete a VM",
+    )
+
+    parser.add_argument(
+        "--vm_mem",
+        type=float,
+        default=300.0,
+        help="Memory overhead of a VM in MB",
+    )
+
+    parser.add_argument(
+        "--mem_load_rate",
+        type=float,
+        default=2000,
+        help="Rate at which memory of function is loaded (MB/s)",
+    )
 
     args = parser.parse_args()
 
@@ -75,7 +158,7 @@ def main():
     lines = []
     with open(filepath, 'r') as file:
         # Discard the first line
-        file.readline()
+        # file.readline()
         
         # Process each subsequent line
         for line in file:
@@ -97,7 +180,20 @@ def main():
     # sort lines by the start timestamp
     sorted_lines = sorted(lines[:len(lines) if args.num_traces == "all" else min(args.num_traces,len(lines))], key = lambda x: x[2])
     print("Processing ", len(sorted_lines), " traces")
-    config = Config()
+    config = Config(
+        FIXED_KEEP_ALIVE=args.keep_alive_time,
+        VM_CACHE_SIZE=args.cache_size,
+        CV_THRESHOLD=args.cv_threshold,
+        VM_THRESHOLD=args.vm_threshold,
+        VM_LOAD_WINDOW=args.cpu_rate_window,
+        HISTOGRAM_MAX_SIZE=args.max_hist,
+        HEAD_PERCENTILE=args.head_percentile,
+        TAIL_PERCENTILE=args.tail_percentile,
+        VM_START_TIME=args.vm_start,
+        VM_DELETE_TIME=args.vm_end,
+        VM_MEM_SIZE=args.vm_mem,
+        MEM_LOAD_RATE=args.mem_load_rate
+    )
     # valid parameters:
         # use_caching: True or False
         # keep alive case: use_histogram=False and use_keep_alive=True
@@ -139,6 +235,10 @@ def main():
     xy = list(zip(time_index,mem))
     sendToReact(xy)
 
+    cold_start_rate = load_balancer.getColdStartPercentage()
+    data = [load_balancer.getMemUsage(), load_balancer.latencies, load_balancer.cold_starts, cold_start_rate]
+    sendFinalDataToReact(data)
+
     end_time = time.time()
     print(f"Simulation of {len(sorted_lines)} function calls for {args.eval_description} took {end_time - start_time} seconds")
 
@@ -155,7 +255,7 @@ def main():
 
     # Analysis 
     eval = args.eval_description
-    print("Overall cold start percentage: ",load_balancer.getColdStartPercentage())
+    print("Overall cold start percentage: ", cold_start_rate)
     print("Max number of vms: ", load_balancer.max_vm_num)
 
     print("Total number of functions successfully executed: ", load_balancer.num_func_completed)
