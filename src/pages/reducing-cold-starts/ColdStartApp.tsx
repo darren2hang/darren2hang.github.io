@@ -6,6 +6,10 @@ import "./ColdStartApp.css"
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
 
+import spinnerImg from "../../assets/spinner.png";
+
+import UploadFileComponent from "./UploadFileComponent";
+
 type OptionType = { value: string; label: string };
 
 function ColdStartApp() {
@@ -13,8 +17,7 @@ function ColdStartApp() {
   const [xData, setXData] = useState<number[]>([]);
   const [yData, setYData] = useState<number[]>([]);
   const [textInput, setTextInput] = useState<string>(
-    `app,func,end_timestamp,duration,memory(optional)
-a,1,1200,0.1
+    `a,1,1200,0.1
 a,1,2400,0.1
 a,1,3600,0.1
 a,1,4800,0.1
@@ -70,6 +73,31 @@ a,1,145000,0.1`);
 
   const [keepAliveTime, setKeepAliveTime] = useState<OptionType | null>(null);
 
+  const [downloadingAzure, setDownloadingAzure] = useState(false);
+
+  const [memData, setMemData] = useState(null);
+  const [latencyData, setLatencyData] = useState(null);
+  const [coldStartData, setColdStartData] = useState(null);
+  const [coldStartRate, setColdStartRate] = useState(null);
+
+  const [filename, setFilename] = useState<string | null>(null);
+
+  const [showConfig, setShowConfig] = useState(false);
+
+  const [cvThreshold, setCvThreshold] = useState(2.0);
+  const [vmThreshold, setVmThreshold] = useState(0.5);
+  const [cpuRateWindow, setCpuRateWindow] = useState(5.0);
+  const [maxHist, setMaxHist] = useState(240);
+  const [headPer, setHeadPer] = useState(5);
+  const [tailPer, setTailPer] = useState(99);
+  const [vmStart, setVmStart] = useState(2.5);
+  const [vmEnd, setVmEnd] = useState(2.0);
+  const [vmMem, setVmMem] = useState(300.0);
+  const [memLoadRate, setMemLoadRate] = useState(2000.0);
+
+  const [keepAliveError, setKeepAliveError] = useState("");
+  const [cacheSizeError, setCacheSizeError] = useState("");
+
   useEffect(() => {
     const worker = new Worker(new URL("./PyodideWorker.mts", import.meta.url), {
       type: "module",
@@ -97,6 +125,13 @@ a,1,145000,0.1`);
         setYData(downsampledY);
       }
 
+      if (type == "final_data") {
+        setMemData(payload.memData);
+        setLatencyData(payload.latencyData);
+        setColdStartData(payload.coldStartData);
+        setColdStartRate(payload.coldStartRate);
+      }
+
       if (type === "done") {
         setStatus("Simulation complete.");
       }
@@ -115,12 +150,26 @@ a,1,145000,0.1`);
     setXData([]);
     setYData([]);
     setStatus("Running...");
+    setColdStartRate(null);
+    setColdStartData(null);
+    setMemData(null);
+    setLatencyData(null);
     workerRef.current?.postMessage({
       type: "run",
       input_file: textInput,
       policy: policy == null ? "histogram_cache" : policy.value,
-      // keepAliveTime: parseInt(keepAliveTime?.value),
-      // cacheSize: parseInt(cacheSize?.value)
+      keepAliveTime: keepAliveTime != null ? keepAliveTime?.value : "10",
+      cacheSize: cacheSize != null ? cacheSize?.value : "256",
+      cvThreshold: String(cvThreshold),
+      vmThreshold: String(vmThreshold),
+      cpuRateWindow: String(cpuRateWindow),
+      maxHist: String(maxHist),
+      headPer: String(headPer),
+      tailPer: String(tailPer),
+      vmStart: String(vmStart),
+      vmEnd: String(vmEnd),
+      vmMem: String(vmMem),
+      memLoadRate: String(memLoadRate),
     });
   };
 
@@ -130,10 +179,11 @@ a,1,145000,0.1`);
   }[]>>, setVal: React.Dispatch<React.SetStateAction<OptionType | null>>) => {
     inputValue = inputValue.replace(/^0+(?=\d)/, '');
     if (!/^\d+$/.test(inputValue)) {
-      alert("Please enter a valid number.");
+      setCacheSizeError("Please enter a valid non-negative number.")
+      setVal(null);
       return;
     }
-
+    setCacheSizeError("");
     const newOption = { value: inputValue, label: inputValue };
     setOptions((prev) => [...prev, newOption]);
     setVal(newOption);
@@ -145,10 +195,11 @@ a,1,145000,0.1`);
   }[]>>, setVal: React.Dispatch<React.SetStateAction<OptionType | null>>) => {
     inputValue = inputValue.replace(/^0+(?=\d)/, '');
     if (!/^\d+(\.\d+)?$/.test(inputValue)) {
-      alert("Please enter a valid number.");
+      setKeepAliveError("Please enter a valid non-negative number.")
+      setVal(null);
       return;
     }
-
+    setKeepAliveError("");
     const newOption = { value: inputValue, label: inputValue };
     setOptions((prev) => [...prev, newOption]);
     setVal(newOption);
@@ -158,7 +209,7 @@ a,1,145000,0.1`);
     if (policy == null) {
       return false;
     }
-    
+
     if (policy.value == "fixed_keep_alive" && keepAliveTime == null) {
       return false;
     }
@@ -169,6 +220,42 @@ a,1,145000,0.1`);
     return true;
   }
 
+  const handleDownload = (content: any, name: string) => {
+    // const content = data.join("\n"); // or JSON.stringify(data, null, 2)
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name + Date.now() + ".txt"; // you can change file name/extension
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const overMaxLineCount = (text: string): boolean => {
+    let count = 0;
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '\n') count++;
+      if (count > 2000) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const getTextOverflowMsg = (): string => {
+    let msg = "";
+    if (filename == null) {
+      msg += "Please upload as file instead";
+    } else {
+      msg += filename + " successfully loaded";
+    }
+    msg += "\n\nTrace too large to be displayed (display limit of 2000 lines)"
+    return msg;
+  }
+
   return (
     <div>
       <header>
@@ -176,7 +263,7 @@ a,1,145000,0.1`);
         <Link to="/projects/reducing-cold-starts/simulation" className="selected">Simulation</Link>
       </header>
       <div className="main_page">
-        <h1>React + Pyodide (TypeScript)</h1>
+        <h1>Serverless Functions Simulation</h1>
         <div className="simulation-page">
           <div className="simulation-inputs">
             <div className="simulation-configs">
@@ -198,10 +285,14 @@ a,1,145000,0.1`);
                     isClearable
                     options={keepAliveOptions}
                     value={keepAliveTime}
-                    onChange={setKeepAliveTime}
+                    onChange={v => {
+                      setKeepAliveTime(v);
+                      setKeepAliveError("");
+                    }}
                     onCreateOption={val => handleCreateDecimalOptions(val, setKeepAliveOptions, setKeepAliveTime)}
                     placeholder="Specify how many minutes to keep a VM around after function execution"
                   />
+                  {keepAliveError && <div style={{ color: "red", marginTop: 4 }}>{keepAliveError}</div>}
                 </div>
               }
               {(policy?.value == "histogram_cache" || policy?.value == "cache_only") &&
@@ -212,35 +303,154 @@ a,1,145000,0.1`);
                     isClearable
                     options={cacheOptions}
                     value={cacheSize}
-                    onChange={setCacheSize}
+                    onChange={v => {
+                      setCacheSize(v);
+                      setCacheSizeError("");
+                    }}
                     onCreateOption={val => handleCreateNumOptions(val, setCacheOptions, setCacheSize)}
                     placeholder="Specify the max number of VMs"
                   />
+                  {cacheSizeError && <div style={{ color: "red", marginTop: 4 }}>{cacheSizeError}</div>}
                 </div>
               }
+              <div className="moreConfigWrapper">
+                <button onClick={() => setShowConfig(true)}>More Configs</button>
+                {showConfig &&
+                  <div className="popup-overlay">
+                    <div className="popup-content">
+                      <div className="config-input">
+                        <label htmlFor="cvInput">CV Threshold for Histogram</label>
+                        <input id="cvInput" type="number" value={cvThreshold}
+                          onChange={e => setCvThreshold(Math.abs(parseFloat(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="vmThreshold">VM CPU Utilization Rate Autoscale Threshold</label>
+                        <input id="vmThreshold" type="number" value={vmThreshold}
+                          onChange={e => setVmThreshold(Math.abs(parseFloat(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="cpuWindow">Window to calculate VM CPU Usage (sec)</label>
+                        <input id="cpuWindow" type="number" value={cpuRateWindow}
+                          onChange={e => setCpuRateWindow(Math.abs(parseFloat(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="maxHist">Max Size of Histogram (minutes)</label>
+                        <input id="maxHist" type="number" value={maxHist}
+                          onChange={e => setMaxHist(Math.abs(parseInt(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="headPer">Head Percentile for Histogram</label>
+                        <input id="headPer" type="number" value={headPer}
+                          onChange={e => setHeadPer(Math.abs(parseInt(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="tailPer">Tail Percentile for Histogram</label>
+                        <input id="tailPer" type="number" value={tailPer}
+                          onChange={e => setTailPer(Math.abs(parseInt(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="vmStart">Time to Start a VM (sec)</label>
+                        <input id="vmStart" type="number" value={vmStart}
+                          onChange={e => setVmStart(Math.abs(parseFloat(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="vmEnd">Time to Delete a VM (sec)</label>
+                        <input id="vmEnd" type="number" value={vmEnd}
+                          onChange={e => setVmEnd(Math.abs(parseFloat(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="vmMem">Memory Overhead of a VM (MB)</label>
+                        <input id="vmMem" type="number" value={vmMem}
+                          onChange={e => setVmMem(Math.abs(parseFloat(e.target.value)))} />
+                      </div>
+                      <div className="config-input">
+                        <label htmlFor="memRate">Memory Load Rate for Functions (MB/s)</label>
+                        <input id="memRate" type="number" value={memLoadRate}
+                          onChange={e => setMemLoadRate(Math.abs(parseFloat(e.target.value)))} />
+                      </div>
+                      <button
+                        className="popup-close-button"
+                        onClick={() => setShowConfig(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
             </div>
-            <button onClick={runPython} disabled={!allInputsFilledOut()}>Run Python</button>
-            <p>{status}</p>
-            <textarea
-              value={textInput}
-              onChange={e => setTextInput(e.target.value)}
-            />
+            <button onClick={runPython} disabled={!allInputsFilledOut() || downloadingAzure || status == "Running..."}>Run Python</button>
+            <p>
+              {status}
+              <br />
+              {coldStartRate && ("Cold start rate: " + coldStartRate)}
+            </p>
+            <div id="inputTraceWrapper">
+              <div id="inputTraceHeader">
+                <label htmlFor="inputTraces">app,func,end_timestamp,duration,memory(optional)</label>
+                {/* <button id="azureDownloadButton" onClick={downloadAndExtractAzureTrace}>Use Data From Azure Trace</button> */}
+                <UploadFileComponent
+                  setDownloading={setDownloadingAzure}
+                  setTextInput={setTextInput}
+                  setFilename={setFilename}
+                />
+              </div>
+              <div id="textAreaWrapper">
+                <textarea
+                  id="inputTraces"
+                  value={!overMaxLineCount(textInput) ? textInput : getTextOverflowMsg()}
+                  onChange={e => setTextInput(e.target.value)}
+                  disabled={downloadingAzure || overMaxLineCount(textInput)}
+                />
+                {downloadingAzure &&
+                  <div id="spinner-wrapper">
+                    <p>Downloading Azure Trace...</p>
+                    <img src={spinnerImg} className="loader" />
+                  </div>}
+              </div>
+            </div>
           </div>
           <div className="simulation-results">
-            {(true || xData.length > 0) && (
-              <Plot
-                data={[
-                  {
-                    x: xData,
-                    y: yData,
-                    type: 'scattergl',
-                    mode: 'lines',
-                    line: { color: 'blue' },
-                  },
-                ]}
-                layout={{ autosize: true, title: 'Memory Usage Over Time' }}
-              />
-            )}
+            <Plot
+              data={[
+                {
+                  x: xData,
+                  y: yData,
+                  type: 'scattergl',
+                  mode: 'lines',
+                  line: { color: 'blue' },
+                },
+              ]}
+              layout={{
+                autosize: true,
+                title: { text: 'Memory Usage Over Time' },
+                xaxis: {
+                  title: { text: 'Time (sec)' }
+                },
+                yaxis: {
+                  title: { text: 'Memory Usage (MB)' }
+                }
+              }}
+              style={{ width: '100%' }}
+            />
+            <div id="downloadContainer">
+              <button
+                id="memDownload"
+                disabled={status != "Simulation complete."}
+                onClick={() => handleDownload(memData, "memory_usage")}>
+                Download Memory Usage
+              </button>
+              <button
+                id="latencyDownload"
+                disabled={status != "Simulation complete."}
+                onClick={() => handleDownload(latencyData, "latency_data")}
+              >Download Latencies</button>
+              <button
+                id="coldStartDownload"
+                disabled={status != "Simulation complete."}
+                onClick={() => handleDownload(coldStartData, "cold_start_data")}
+              >Download Cold Starts</button>
+            </div>
           </div>
         </div>
 
