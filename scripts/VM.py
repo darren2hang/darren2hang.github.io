@@ -433,7 +433,7 @@ class VM:
                 self.addMemForTimeFrame(mem_usage, self.current_ts, ts)
                 self.current_ts = ts
 
-        if self.use_histogram and self.prev_ts != -1 and ts - self.prev_ts > 60 * self.config.HISTOGRAM_MAX_SIZE:
+        if self.use_histogram and self.prev_ts != -1 and ts - self.prev_ts > 60 * self.config.HISTOGRAM_MAX_SIZE and len(self.function_queue) == 0:
             delete = True
         # print("finished speed forward ts: ", self.current_ts, ", keep alive end ts: ", self.keepalive_end_ts)
         return mem_usage, delete, num_func_completed, False
