@@ -113,7 +113,7 @@ a,1,145000,0.1`);
       }
 
       if (type === "data") {
-        console.log("App.tsx received data")
+        // console.log("App.tsx received data")
         // console.log(payload)
         // console.log("payload x")
         // console.log(payload.length)
@@ -387,7 +387,7 @@ a,1,145000,0.1`);
             </p>
             <div id="inputTraceWrapper">
               <div id="inputTraceHeader">
-                <label htmlFor="inputTraces">app,func,end_timestamp,duration,memory(optional)</label>
+                <label htmlFor="inputTraces">app, func, end_timestamp(s), duration(s), memory(MB) <span  id="optional">optional</span></label>
                 {/* <button id="azureDownloadButton" onClick={downloadAndExtractAzureTrace}>Use Data From Azure Trace</button> */}
                 <UploadFileComponent
                   setDownloading={setDownloadingAzure}
