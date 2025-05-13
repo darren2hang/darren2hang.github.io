@@ -225,15 +225,15 @@ def main():
             print("finished running ",i," calls")
         if i % 10000 == 0:
             mem = load_balancer.getMemUsage()
-            time_index = list(range(len(mem)))
-            xy = list(zip(time_index,mem))
-            sendToReact(xy)
+            # time_index = list(range(len(mem)))
+            # xy = list(zip(time_index,mem))
+            sendToReact(mem)
     load_balancer.speedForward(finish_time+10)
 
     mem = load_balancer.getMemUsage()
-    time_index = list(range(len(mem)))
-    xy = list(zip(time_index,mem))
-    sendToReact(xy)
+    # time_index = list(range(len(mem)))
+    # xy = list(zip(time_index,mem))
+    sendToReact(mem)
 
     cold_start_rate = load_balancer.getColdStartPercentage()
     data = [load_balancer.getMemUsage(), load_balancer.latencies, load_balancer.cold_starts, cold_start_rate]
