@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import Plot from 'react-plotly.js';
-import { LTTB } from 'downsample';
+import { LTTB, DataPoint } from 'downsample';
 import { Link } from "react-router-dom";
 import "./ColdStartApp.css"
 import Select from "react-select";
@@ -117,10 +117,18 @@ a,1,145000,0.1`);
         // console.log(payload)
         // console.log("payload x")
         // console.log(payload.length)
-        const n = Math.floor(payload.length / 30);
-        const downsampled = Array.from(LTTB(payload, n)); // Downsample to 1000 points
+        const n = Math.floor(payload[0].length / 30);
+        // console.log(payload)
+        const dataInPairForm = []
+        for (let i = 0; i < payload[0].length; i++) {
+          const p = [payload[0][i], payload[1][i]] as DataPoint;
+          dataInPairForm.push(p);
+        }
+        // console.log(dataInPairForm)
+        const downsampled = Array.from(LTTB(dataInPairForm, n)); // Downsample to 1000 points
         const downsampledX = downsampled.map((d: any) => d[0]);
         const downsampledY = downsampled.map((d: any) => d[1]);
+        console.log(downsampled)
         setXData(downsampledX);
         setYData(downsampledY);
       }
@@ -387,7 +395,7 @@ a,1,145000,0.1`);
             </p>
             <div id="inputTraceWrapper">
               <div id="inputTraceHeader">
-                <label htmlFor="inputTraces">app, func, end_timestamp(s), duration(s), memory(MB) <span  id="optional">optional</span></label>
+                <label htmlFor="inputTraces">app, func, end_timestamp(s), duration(s), <span  id="optional">(optional: memory in MB)</span></label>
                 {/* <button id="azureDownloadButton" onClick={downloadAndExtractAzureTrace}>Use Data From Azure Trace</button> */}
                 <UploadFileComponent
                   setDownloading={setDownloadingAzure}

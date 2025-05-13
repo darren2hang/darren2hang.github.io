@@ -1,6 +1,7 @@
 from VM import VM, VM_STATUS
 from Histogram import Histogram
 from enum import Enum
+import numpy as np
 
 class Config:
     def __init__(
@@ -49,7 +50,7 @@ class LoadBalancer:
         self.current_ts = 0
         self.num_cold_starts = 0
         self.num_warm_starts = 0
-        self.memory_usage = []
+        self.memory_usage = [[], []]
         self.config = config
         self.use_caching = use_caching
         self.use_histogram = use_histogram
@@ -232,7 +233,10 @@ class LoadBalancer:
                     self.num_vm -= 1
             self.vm_map[app_name] = [vm for i, vm in enumerate(self.vm_map[app_name]) if not delete_arr[i]]
         
-        self.memory_usage.extend([sum(values) for values in zip(*mem_usages)])
+        if len(mem_usages) != 0:
+            self.memory_usage[0].extend(mem_usages[0][0])
+            sum_mem = np.sum([mem_use[1] for mem_use in mem_usages], axis=0).tolist()
+            self.memory_usage[1].extend(sum_mem)
 
 
     def getColdStartPercentage(self):

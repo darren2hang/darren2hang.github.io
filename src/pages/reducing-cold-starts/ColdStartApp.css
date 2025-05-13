@@ -195,3 +195,27 @@ textarea.grow {
         margin-right: 0.5rem;
     }
 }
+
+.horizontal-image-wrapper {
+    img {
+        width: 80vw;
+    }
+}
+
+@media (min-width: 900px) {
+    .horizontal-image-wrapper {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        gap: 5rem;
+
+        .text-wrapper {
+            width: 60%;
+        }
+
+        img {
+            width: 40%;
+            height: fit-content;
+        }
+    }
+}

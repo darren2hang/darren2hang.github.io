@@ -250,13 +250,14 @@ class VM:
     
     def speedForward(self, ts, latencies, scheduling_delays):
         # new_ts = self.current_ts
-        mem_arr = []
+        mem_arr = [[], []]
         delete = False
         total_func_comp = 0
         new_vm = True
         while new_vm and self.current_ts < ts:
             new_mem, delete, num_func_completed, new_vm = self.speedForwardHelper(ts, latencies, scheduling_delays)
-            mem_arr.extend(new_mem)
+            mem_arr[0].extend(new_mem[0])
+            mem_arr[1].extend(new_mem[1])
             total_func_comp += num_func_completed
         
         return mem_arr, delete, total_func_comp
@@ -268,7 +269,7 @@ class VM:
         num_func_completed = 0
         if ts < self.current_ts:
             return [], False, num_func_completed
-        mem_usage = []
+        mem_usage = [[], []]
         delete = False
         # print("in speedforward, current time: ", self.current_ts, ", ts: ", ts)
 
@@ -442,7 +443,8 @@ class VM:
         if start_time >= end_time:
             return
         for i in range(math.ceil(start_time), math.floor(end_time)+1):
-            mem_arr.append(self.size if not use_zero else 0)
+            mem_arr[0].append(i)
+            mem_arr[1].append(self.size if not use_zero else 0)
     
     def getPriority(self):
         return self.clock + self.frequency * self.cost / self.size
