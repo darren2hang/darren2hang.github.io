@@ -234,8 +234,15 @@ class LoadBalancer:
             self.vm_map[app_name] = [vm for i, vm in enumerate(self.vm_map[app_name]) if not delete_arr[i]]
         
         if len(mem_usages) != 0:
-            self.memory_usage[0].extend(mem_usages[0][0])
-            sum_mem = np.sum([mem_use[1] for mem_use in mem_usages], axis=0).tolist()
+            # Extend memory_usage[0] with the longest mem_usages[i][0]
+            longest_0 = max(mem_usages, key=lambda x: len(x[0]))[0]
+            self.memory_usage[0].extend(longest_0)
+
+            # Pad mem_usages[i][1] with zeros to match max length, then sum
+            max_len = max(len(mem_use[1]) for mem_use in mem_usages)
+
+            padded_1s = [np.pad(mem_use[1], (0, max_len - len(mem_use[1])), constant_values=0) for mem_use in mem_usages]
+            sum_mem = np.sum(padded_1s, axis=0).tolist()
             self.memory_usage[1].extend(sum_mem)
 
 
