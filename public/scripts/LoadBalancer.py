@@ -234,16 +234,51 @@ class LoadBalancer:
             self.vm_map[app_name] = [vm for i, vm in enumerate(self.vm_map[app_name]) if not delete_arr[i]]
         
         if len(mem_usages) != 0:
-            # Extend memory_usage[0] with the longest mem_usages[i][0]
-            longest_0 = max(mem_usages, key=lambda x: len(x[0]))[0]
-            self.memory_usage[0].extend(longest_0)
+            prevTime = -1
+            if len(self.memory_usage[0]) > 0:
+                prevTime = self.memory_usage[0][-1]
+                for mem in mem_usages:
+                    if len(mem[0]) == 0:
+                        continue
+                    t = mem[0][0]
+                    memChunk = mem[1][0]
+                    if t > prevTime:
+                        continue
+                    prevT = self.memory_usage[0][idx]
+                    if t == prevT:
+                        self.memory_usage[1][idx] += memChunk
+                    else: 
+                        while t < prevT:
+                            idx -=1
+                            prevT = self.memory_usage[0][idx]
+                    for i in range(len(mem[0])):
+                        t = mem[0][i]
+                        memChunk = mem[1][i]
+                        if t > prevTime:
+                            break
+                        self.memory_usage[1][idx] += memChunk
+                        idx += 1
+            else:
+                prevTime = min((min(mem[0]) for mem in mem_usages if mem[0]), default=-1) - 1
 
-            # Pad mem_usages[i][1] with zeros to match max length, then sum
-            max_len = max(len(mem_use[1]) for mem_use in mem_usages)
+            maxT = max((max(mem[0]) for mem in mem_usages if mem[0]), default=prevTime)
+            new_mems = [0] * (maxT-prevTime)
+            new_times = [x for x in range(prevTime+1, maxT+1)]
 
-            padded_1s = [np.pad(mem_use[1], (0, max_len - len(mem_use[1])), constant_values=0) for mem_use in mem_usages]
-            sum_mem = np.sum(padded_1s, axis=0).tolist()
-            self.memory_usage[1].extend(sum_mem)
+            if maxT > prevTime:
+                for mem in mem_usages:
+                    idx = 0
+                    if len(mem[0]) > 0:
+                        idx = mem[0][0] - (prevTime + 1)
+                    for i in range(len(mem[0])):
+                        t = mem[0][i]
+                        memChunk = mem[1][i]
+
+                        if t > prevTime:
+                            new_mems[idx] += memChunk
+                            idx += 1
+                self.memory_usage[0].extend(new_times)
+                self.memory_usage[1].extend(new_mems)
 
 
     def getColdStartPercentage(self):

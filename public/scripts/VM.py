@@ -426,6 +426,10 @@ class VM:
                     else:
                         self.addMemForTimeFrame(mem_usage, self.current_ts, min(self.keepalive_end_ts, ts))
                         self.current_ts = min(self.keepalive_end_ts, ts)
+                    
+                    if self.use_histogram and self.prev_ts != -1 and self.current_ts - self.prev_ts > 60 * self.config.HISTOGRAM_MAX_SIZE and len(self.function_queue) == 0:
+                        delete = True
+                        return mem_usage, delete, num_func_completed, False
 
             else:
             # we still have functions to execute, but we didn't execute them because they finish after ts
@@ -440,9 +444,12 @@ class VM:
         return mem_usage, delete, num_func_completed, False
     
     def addMemForTimeFrame(self, mem_arr, start_time, end_time, use_zero=False):
-        if start_time >= end_time:
+        if start_time >= math.floor(end_time):
             return
-        for i in range(math.ceil(start_time), math.floor(end_time)+1):
+        start_idx = math.ceil(start_time)
+        if len(mem_arr[0]) > 0 and start_idx == mem_arr[0][-1]:
+            start_idx += 1
+        for i in range(start_idx, math.floor(end_time)+1):            
             mem_arr[0].append(i)
             mem_arr[1].append(self.size if not use_zero else 0)
     
