@@ -51,7 +51,7 @@ self.onmessage = async (event) => {
       // console.log(jsObj)
       self.postMessage({
         type: 'final_data', payload: {
-          memData: jsObj[0][1], // only send mem data, don't send time index
+          memData: jsObj[0],
           latencyData: jsObj[1],
           coldStartData: jsObj[2],
           coldStartRate: jsObj[3]

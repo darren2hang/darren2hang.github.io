@@ -236,7 +236,8 @@ def main():
     sendToReact(mem)
 
     cold_start_rate = load_balancer.getColdStartPercentage()
-    data = [load_balancer.getMemUsage(), load_balancer.latencies, load_balancer.cold_starts, cold_start_rate]
+    times, mems = load_balancer.getMemUsage()
+    data = [[[ts, m] for ts, m in zip(times, mems)], load_balancer.latencies, load_balancer.cold_starts, cold_start_rate]
     sendFinalDataToReact(data)
 
     end_time = time.time()

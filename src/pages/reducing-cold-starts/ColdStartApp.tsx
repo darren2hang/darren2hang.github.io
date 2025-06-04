@@ -230,7 +230,7 @@ a,1,145000,0.1`);
 
   const handleDownload = (content: any, name: string) => {
     // const content = data.join("\n"); // or JSON.stringify(data, null, 2)
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([JSON.stringify(content)], { type: "text/plain;charset=utf-8" });
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
